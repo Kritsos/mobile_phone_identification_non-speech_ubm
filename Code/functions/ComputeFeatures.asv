@@ -1,0 +1,53 @@
+function [FeatureMatrix FeatureMatrix1] = ComputeFeatures(Signal, Fs, AuditoryMod)
+   
+
+% AuditoryModel = 1 : Terhardt
+% AuditoryModel = 2 : Lyons
+
+   
+
+%% Sonogram Initialization
+    p.fs          = Fs;         %% sampling frequency of given wav (unit: Hz)
+    p.do_visu     = 0;          %% create some figures
+    p.do_sone     = 1;          %% compute sone (otherwise dB)
+    p.do_spread   = 1;          %% apply spectral masking
+    p.outerear = 'terhardt';    %% outer ear model {'terhardt' | 'none'}
+    p.fft_size = 256;           %% window size (unit: samples) 256 are ~23ms @ 11kHz 
+    p.hopsize  = 32;            %% fft window hopsize (unit: samples)
+    p.bark_type   = 'table';    %% type of bark scale to use (either:
+                                %% 'table' lookup (=default) with max 24 bands 
+                                %% (for 44kHz), or vector [min_freq max_freq num_bands]
+    p.dB_max      = 96;         %% max dB of input wav (for 16 bit input
+                                %%    96dB is SPL)
+
+   %% Compute Sonogram.                             
+   if (AuditoryModel == 1)
+       [ear, Ntot,p] = ma_sone(Signal,p); 
+   end
+   %% Use Lyons Auditory Model.
+   if (AuditoryModel == 2)
+       %Signal = Signal * (10^(96/20));
+       ear = LyonPassiveEar(Signal, Fs,20,8);
+   end
+   
+   
+   %% Modulation Scale Features
+   AuditoryModulationScalogram = modscale(ear);
+   
+   [rms cms] = size(AuditoryModulationScalogram);
+   FeatureMatrix1 = AuditoryModulationScalogram;
+   %% Compute MODulation Scale Feautures for each acoustic frequency subband. 
+   for i=1:rms
+         [U S V] = svd(AuditoryModulationScalogram(i,:)); 
+         D = diag(S);
+         V = V(:, 1); % Modulation Frequency Information.
+         S = S(1, 1); % Firt Singular Value.
+         FeatureMatrix(i,:) = (sign(sum(V))*sqrt(S)*V); % Modulation Scale Features according to [Atlas et.al].    
+         %FeatureMatrix1(i,:) = sqrt(S)*V; % Modulation Scale Features according to Boutsidis Theorem.
+   end
+     
+
+     
+   
+     
+
